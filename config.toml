@@ -1,0 +1,102 @@
+# AI-HPC Lorenz Project Configuration
+# Edit these parameters before running the notebook
+
+[simulation]
+# Lorenz system parameters
+sigma = 10.0
+rho = 28.0
+beta = 2.667  # 8/3
+
+# Integration parameters
+num_trajectories = 100
+dt = 0.01
+simulation_time = 25.0
+checkpoint = 20
+
+[dataset]
+# Dataset generation parameters
+lookback_window = 10
+train_ratio = 0.70
+val_ratio = 0.15
+test_ratio = 0.15
+
+# Normalization
+normalize = true
+scaler_type = "standard"  # standard, minmax, robust
+
+[models]
+# MLP Model
+mlp_hidden_dims = [128, 64, 32]
+mlp_dropout = 0.2
+
+# LSTM Model
+lstm_hidden = 64
+lstm_layers = 2
+lstm_dropout = 0.2
+
+[training]
+# Training hyperparameters
+learning_rate = 0.001
+batch_size = 32
+num_epochs = 200
+optimizer = "adam"
+loss_function = "mse"
+device = "auto"  # auto, cuda, cpu
+
+# Early stopping
+use_early_stopping = false
+patience = 20
+min_delta = 0.00001
+
+[evaluation]
+# Evaluation parameters
+prediction_horizon = 200
+num_rollout_predictions = 1
+metrics = ["rmse", "mae", "max_error"]
+
+[output]
+# Output directories
+data_dir = "data"
+models_dir = "models"
+plots_dir = "plots"
+report_dir = "report"
+
+# File naming
+save_trajectories = true
+save_predictions = true
+save_metrics = true
+save_models = true
+
+[visualization]
+# Plotting options
+figure_dpi = 150
+figure_format = "png"
+show_plots = true
+
+# Plot selection
+plot_3d_attractor = true
+plot_training_history = true
+plot_error_analysis = true
+plot_performance = true
+plot_phase_space = true
+plot_trajectories = true
+plot_rollout = true
+plot_model_comparison = true
+plot_error_horizon = true
+
+[report]
+# LaTeX report generation
+generate_report = true
+report_format = "ieee"
+include_figures = true
+figure_width = 0.8
+
+[hpc]
+# HPC compilation settings
+compile_openmp = true
+compile_cuda = true
+openmp_parallel_threads = 0  # 0 = auto detect
+
+# Compiler settings
+gcc_flags = "-O3 -march=native"
+nvcc_flags = "-O3"

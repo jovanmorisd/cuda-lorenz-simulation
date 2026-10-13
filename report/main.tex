@@ -1,0 +1,907 @@
+% =============================================================
+%  AI Surrogate Modeling for Accelerating Chaotic Lorenz
+%  Simulation using OpenMP and CUDA
+%  Author : Jovan Moris  |  CS23B2058
+%  Date   : March 2026
+% =============================================================
+
+\documentclass[11pt,a4paper]{article}
+
+% - Fonts -
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{palatino}
+\usepackage{mathpazo}
+\usepackage{microtype}
+
+% - Mathematics -
+\usepackage{amsmath,amssymb}
+
+% - Page geometry -
+\usepackage[top=25mm,bottom=25mm,left=28mm,right=28mm,
+            headheight=14pt]{geometry}
+
+% - Headers & footers -
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small\textit{AI Surrogate Modeling --- Lorenz System}}
+\fancyhead[R]{\small\textit{Jovan Moris D - CS23B2058}}
+\fancyfoot[C]{\thepage}
+
+% - Colours -
+\usepackage[dvipsnames,table]{xcolor}
+\definecolor{accent}{RGB}{0,76,153}
+\definecolor{lightblue}{RGB}{235,242,255}
+\definecolor{darkgray}{RGB}{80,80,80}
+
+% - Graphics -
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage[labelfont={bf,color=accent},font=small,
+            justification=centering]{caption}
+
+% - Tables -
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+% - Lists -
+\usepackage{enumitem}
+\setlist[itemize]{noitemsep,topsep=3pt,leftmargin=1.4em}
+\setlist[enumerate]{noitemsep,topsep=3pt,leftmargin=1.6em}
+
+% - Code listings -
+\usepackage{listings}
+\lstdefinestyle{mycode}{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{accent}\bfseries,
+  commentstyle=\color{OliveGreen}\itshape,
+  stringstyle=\color{BrickRed},
+  numbers=left, numberstyle=\tiny\color{gray},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, captionpos=b,
+  backgroundcolor=\color{gray!6},
+  xleftmargin=1.6em, xrightmargin=0.4em,
+  aboveskip=6pt, belowskip=4pt,
+  showstringspaces=false
+}
+\lstset{style=mycode, language=Python}
+
+% - Section headings -
+\usepackage{titlesec}
+\titleformat{\section}
+  {\large\bfseries\color{accent}}{\thesection}{1em}{}[\color{accent}\titlerule]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{accent!85!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{darkgray}}{\thesubsubsection}{1em}{}
+\titlespacing{\section}{0pt}{14pt}{6pt}
+\titlespacing{\subsection}{0pt}{10pt}{4pt}
+
+% - Spacing -
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\baselinestretch}{1.13}
+
+% - Hyperlinks -
+\usepackage[colorlinks=true,linkcolor=accent,
+            citecolor=accent,urlcolor=accent]{hyperref}
+
+% - Bibliography -
+\usepackage[numbers,sort&compress]{natbib}
+
+% - Convenience commands -
+\newcommand{\good}[1]{{\color{OliveGreen}\textbf{#1}}}
+\newcommand{\bad}[1]{{\color{BrickRed}\textit{#1}}}
+
+% =============================================================
+\begin{document}
+
+% - Title page -
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\color{accent}\rule{\linewidth}{2pt}}\\[0.4cm]
+{\LARGE\bfseries\color{accent}
+AI Surrogate Modeling for Accelerating\\[0.3em]
+Chaotic Lorenz Simulation\\[0.3em]
+using OpenMP and CUDA}\\[0.4cm]
+{\color{accent}\rule{\linewidth}{1pt}}\\[1.2cm]
+{\large AI-HPC Project}\\[1.8cm]
+
+\begin{tabular}{rl}
+  \textbf{Author}      & Jovan Moris D\\[4pt]
+  \textbf{Roll No.}    & CS23B2058 \\[4pt]
+  \textbf{Department}  & Computer Science \& Engineering \\[4pt]
+  \textbf{Course}      & High Performance Computing \\[4pt]
+  \textbf{Date}        & March 2026 \\
+\end{tabular}
+
+\vfill
+
+\begin{abstract}
+\noindent
+This report presents a complete implementation of a hybrid HPC and AI pipeline
+for accelerating the simulation of the Lorenz chaotic dynamical system. The
+system architecture works in two complementary stages: \textbf{(1)} parallel
+computation using OpenMP (multi-core CPU) and CUDA (GPU) to rapidly generate
+trajectories up to a defined checkpoint, and \textbf{(2)} trained AI surrogate
+models that take over from the checkpoint to predict the remaining trajectory
+without further numerical integration. This design correctly reflects the
+complementary roles of HPC and AI --- HPC accelerates the physics-based simulation
+while AI replaces it beyond the predictability horizon.
+
+The HPC component delivers the project's primary contribution: OpenMP achieves
+\good{1682$\times$} speedup and CUDA achieves \good{3299$\times$} speedup over
+the Python RK4 baseline. For the AI surrogate component, four models are
+implemented and evaluated: MLP, improved LSTM, Temporal Convolutional Network
+(TCN), and Echo State Network (ESN). TCN achieves a single-step RMSE of
+\good{0.0128} and ESN achieves \good{0.0134} --- representing a \good{97.6\%}
+improvement over the original baseline RMSE of 0.5256. The ESN is particularly
+notable, achieving near-identical accuracy to the TCN while training in just
+\good{33 seconds} compared to TCN's 159 minutes.
+\end{abstract}
+
+\vspace{0.5cm}
+{\color{accent}\rule{\linewidth}{2pt}}
+\end{titlepage}
+
+% - TOC -
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\newpage
+
+% =============================================================
+\section{Introduction}
+% =============================================================
+
+\subsection{Motivation and Problem Statement}
+
+The Lorenz system, introduced by Edward Lorenz in 1963~\cite{lorenz1963}, is governed
+by three coupled ordinary differential equations:
+
+\begin{align}
+  \frac{dx}{dt} &= \sigma(y - x) \label{eq:lx}\\
+  \frac{dy}{dt} &= x(\rho - z) - y \label{eq:ly}\\
+  \frac{dz}{dt} &= xy - \beta z \label{eq:lz}
+\end{align}
+
+With standard chaotic parameters $\sigma=10$, $\rho=28$, $\beta=\tfrac{8}{3}$,
+trajectories never repeat and are exquisitely sensitive to initial conditions ---
+the famous \textit{butterfly effect}. Simulating large ensembles of such trajectories
+is computationally demanding, making this system an ideal testbed for HPC and AI
+acceleration.
+
+\subsection{System Architecture: The Correct HPC + AI Design}
+
+A key insight of this project is that HPC and AI serve \textbf{complementary, not
+competing, roles}:
+
+\begin{enumerate}
+  \item \textbf{Phase 1 --- HPC Simulation to Checkpoint:} OpenMP and CUDA rapidly
+        generate trajectories up to a defined checkpoint using parallelised RK4
+        integration. This phase exploits parallel structure: each
+        trajectory is independent, requiring no inter-thread communication.
+  \item \textbf{Phase 2 --- AI Surrogate from Checkpoint:} A trained surrogate model
+        (MLP or LSTM or TCN or ESN) takes the checkpoint state as input and predicts the remaining
+        trajectory without further numerical integration. This replaces the expensive
+        per-step ODE solving with a single fast forward pass.
+\end{enumerate}
+
+This design is both physically motivated and computationally sound. The HPC component
+handles the deterministic early phase accurately; the AI component handles the longer
+horizon where the Lyapunov exponent ($\lambda \approx 0.906$) limits precise
+predictability anyway.
+
+
+\subsection{Problem Statement}
+
+\subsubsection{Why Lorenz Simulation is Expensive}
+
+Generating a single Lorenz trajectory requires solving three coupled ODEs at every
+time step. Using RK4 with $\Delta t = 0.01$ over $T = 25$ seconds requires 2500
+sequential integration steps per trajectory. For a single trajectory this is
+manageable, but real-world applications require ensembles of thousands to millions
+of trajectories:
+
+\begin{itemize}
+  \item \textbf{Ensemble forecasting:} Weather models require $10^3$--$10^6$
+        trajectories to quantify forecast uncertainty.
+  \item \textbf{Uncertainty quantification:} Monte Carlo methods for sensitivity
+        analysis require thousands of independent runs.
+  \item \textbf{Parameter sweeps:} Bifurcation analysis sweeps $\sigma$, $\rho$,
+        $\beta$ across a grid, requiring a full simulation per grid point.
+  \item \textbf{Optimal control:} Real-time trajectory optimisation requires
+        repeated fast simulation to evaluate candidate control actions.
+  \item \textbf{Data-driven surrogate training:} Training neural surrogates requires
+        generating large datasets of trajectories as ground truth.
+\end{itemize}
+
+In pure Python, generating 100 trajectories takes $\approx 3.4$ seconds. Scaling to
+$10^5$ trajectories would require $\approx 57$ minutes --- far too slow for real-time
+or interactive applications. This motivates both HPC acceleration and AI surrogates.
+
+\subsubsection{Why Standard AI Surrogates Struggle with Chaos}
+
+Chaotic systems pose a unique challenge for data-driven models. The positive Lyapunov
+exponent ($\lambda \approx 0.906$) means prediction errors grow exponentially as
+$\varepsilon(t) = \varepsilon_0 e^{\lambda t}$. This imposes a hard
+\textbf{predictability horizon} of $\approx 1/\lambda \approx 1.1$ time units
+($= 110$ steps at $\Delta t=0.01$) beyond which \textit{any} deterministic model
+--- no matter how accurate --- will diverge from the true trajectory.
+
+This is not a failure of the model; it is a physical law. The correct response is not
+to expect long-horizon pointwise accuracy, but to instead ask:
+\begin{enumerate}
+  \item Can the surrogate predict accurately within the Lyapunov horizon?
+  \item Does the surrogate remain on the correct attractor after divergence?
+  \item Can the surrogate replace expensive simulation for rapid approximate screening?
+\end{enumerate}
+
+\subsubsection{The Hybrid HPC + AI Solution}
+
+This project proposes a two-phase pipeline that correctly addresses both challenges:
+
+\begin{enumerate}
+  \item \textbf{Phase 1 (HPC):} Generate trajectories rapidly and accurately up to
+        a checkpoint using OpenMP or CUDA parallelised RK4. Since trajectories are
+        independent, this is embarrassingly parallel --- perfect for multi-core and
+        GPU architectures.
+  \item \textbf{Phase 2 (AI):} From the checkpoint state, a trained surrogate model
+        (TCN or ESN) predicts the remaining trajectory in a single forward pass,
+        without further numerical integration.
+\end{enumerate}
+
+The speedup comes from two directions: HPC reduces the cost of accurate simulation,
+and AI eliminates it entirely beyond the checkpoint. Together they enable trajectory
+generation at speeds impractical with either approach alone.
+
+\subsection{Research Objectives}
+
+\begin{enumerate}
+  \item Implement OpenMP and CUDA parallelisation for RK4-based trajectory generation
+        and benchmark speedups.
+  \item Train and evaluate four AI surrogate models: MLP, improved LSTM, TCN, and ESN.
+  \item Demonstrate the complementary HPC+AI pipeline on the Lorenz system.
+  \item Honestly analyse both achievements and limitations.
+\end{enumerate}
+
+
+% =============================================================
+\section{Mathematical Foundation}
+% =============================================================
+
+\subsection{Lorenz System Properties}
+
+The system \eqref{eq:lx}--\eqref{eq:lz} with standard parameters has:
+\begin{itemize}
+  \item Largest Lyapunov exponent $\lambda \approx 0.906$ --- trajectories diverge
+        as $\varepsilon e^{\lambda t}$.
+  \item Predictability horizon $\approx 1/\lambda \approx 1.1$ time units
+        ($= 110$ steps at $\Delta t=0.01$).
+  \item Strange attractor with Hausdorff dimension $\approx 2.06$.
+\end{itemize}
+
+\subsection{Fourth-Order Runge-Kutta Integration}
+
+\begin{align}
+  \mathbf{k}_1 &= f(\mathbf{y}_n), \quad
+  \mathbf{k}_2 = f\!\left(\mathbf{y}_n + \tfrac{\Delta t}{2}\mathbf{k}_1\right)\\
+  \mathbf{k}_3 &= f\!\left(\mathbf{y}_n + \tfrac{\Delta t}{2}\mathbf{k}_2\right),
+  \quad \mathbf{k}_4 = f(\mathbf{y}_n + \Delta t\,\mathbf{k}_3)\\
+  \mathbf{y}_{n+1} &= \mathbf{y}_n +
+      \frac{\Delta t}{6}(\mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4)
+\end{align}
+
+\subsection{Supervised Learning Formulation}
+
+Surrogate modelling is cast as sliding-window regression:
+\begin{equation}
+  \mathcal{D} = \bigl\{(\mathbf{X}^{(i)},\,\mathbf{y}^{(i)})\bigr\}_{i=1}^{N},
+  \quad \mathbf{X}^{(i)} \in \mathbb{R}^{L \times 3},\quad
+  \mathbf{y}^{(i)} \in \mathbb{R}^{3}
+\end{equation}
+
+with $L=50$ (lookback window), z-score normalisation applied to training split only.
+
+% =============================================================
+\section{Implementation}
+% =============================================================
+
+\subsection{OpenMP C++ Parallelisation}
+
+The C++ solver parallelises over trajectories using \texttt{\#pragma omp parallel for}.
+Each trajectory is fully independent --- no shared state, no synchronisation needed.
+
+\begin{lstlisting}[language=C++,
+  caption={OpenMP parallel trajectory loop --- \texttt{src/openmp\_lorenz.cpp}}]
+#pragma omp parallel for schedule(dynamic)
+for (int traj = 0; traj < num_trajectories; traj++) {
+    double x = init_x[traj], y = init_y[traj], z = init_z[traj];
+    for (int step = 0; step < total_steps; step++) {
+        rk4_step(&x, &y, &z, dt);
+        trajectories[traj][step][0] = x;
+        trajectories[traj][step][1] = y;
+        trajectories[traj][step][2] = z;
+    }
+}
+\end{lstlisting}
+
+Compilation: \texttt{g++ -O3 -fopenmp -march=native src/openmp\_lorenz.cpp}.
+
+\newpage
+
+\subsection{CUDA GPU Implementation}
+
+The CUDA kernel assigns one thread per trajectory. Each thread runs the complete RK4
+loop independently, operating entirely in registers with no global memory
+synchronisation required.
+
+\begin{lstlisting}[language=C,
+  caption={CUDA kernel --- \texttt{cuda/cuda\_lorenz.cu}}]
+__global__ void lorenzKernel(double* trajectories,
+                              int total_steps, double dt,
+                              int num_trajectories) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= num_trajectories) return;
+
+    double x = init_x[tid], y = init_y[tid], z = init_z[tid];
+    for (int step = 0; step < total_steps; step++) {
+        rk4_step_cuda(&x, &y, &z, dt);
+        int idx = tid * total_steps * 3 + step * 3;
+        trajectories[idx]   = x;
+        trajectories[idx+1] = y;
+        trajectories[idx+2] = z;
+    }
+}
+\end{lstlisting}
+
+Compilation: \texttt{nvcc -O3 cuda/cuda\_lorenz.cu}.
+
+\subsection{AI Surrogate Models}
+
+\subsubsection{MLP Surrogate}
+Flattened input ($50 \times 3 = 150$ features), architecture $150 \to 128 \to 64
+\to 32 \to 3$. Acts as a flat baseline with no temporal inductive bias.
+
+\subsubsection{Improved LSTM}
+Hidden size 256, 3 layers, dropout 0.2. Processes window sequentially; learns
+temporal dependencies unavailable to MLP.
+
+\subsubsection{Temporal Convolutional Network (TCN)}
+Four dilated causal convolution blocks with dilation factors 1, 2, 4, 8. Each block:
+CausalConv1d $\to$ BatchNorm $\to$ ReLU $\to$ Dropout $\to$ residual connection.
+Receptive field grows exponentially without vanishing gradients.
+
+\newpage 
+
+
+\subsubsection{Echo State Network (ESN)}
+A fixed random reservoir acts as a nonlinear dynamical memory. Only the linear
+readout weights are trained via ridge regression --- no backpropagation, no epochs.
+
+\begin{lstlisting}[caption={ESN reservoir update and readout training}]
+# Reservoir update (leaky integrator)
+x = (1-lr)*x + lr*np.tanh(W @ x + W_in @ u)
+
+# Readout training - ridge regression only
+readout = Ridge(alpha=1e-4)
+readout.fit(reservoir_states[washout:], data[washout+1:])
+\end{lstlisting}
+
+Key hyperparameters: \texttt{n\_reservoir=500}, \texttt{spectral\_radius=0.95}
+(must be $<1.0$ for stability), \texttt{leaking\_rate=0.5}, \texttt{washout=200}.
+
+\subsection{Model Architecture Diagrams}
+
+Figures \ref{fig:mlp_arch}--\ref{fig:esn_arch} illustrate the architecture of each
+surrogate model. These diagrams show the data flow, layer dimensions, and key
+design choices for each approach.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{arch_mlp.png}
+  \caption{MLP surrogate architecture. The input window (50 timesteps x 3 dimensions
+           = 150 features) is flattened and passed through three fully connected
+           hidden layers with ReLU activation and dropout. No temporal structure
+           is exploited.}
+  \label{fig:mlp_arch}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{arch_lstm.png}
+  \caption{Improved LSTM surrogate architecture. Three stacked LSTM layers
+           (hidden=256) process the input sequence step by step, maintaining
+           hidden state $ and cell state $ across timesteps. Only the last
+           hidden state feeds the output head.}
+  \label{fig:lstm_arch}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{arch_tcn.png}
+  \caption{TCN surrogate architecture. Four dilated causal convolution blocks
+           with dilation factors 1, 2, 4, 8 achieve a receptive field of 31+
+           timesteps without any recurrence. Residual connections prevent
+           vanishing gradients.}
+  \label{fig:tcn_arch}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{arch_esn.png}
+  \caption{ESN (Echo State Network) architecture. The reservoir (500 neurons,
+           spectral radius=0.95) is fixed and random --- never trained. Only the
+           linear readout layer is fitted via ridge regression. This makes ESN
+           training orders of magnitude faster than gradient-based methods.}
+  \label{fig:esn_arch}
+\end{figure}
+
+\subsection{Training Configuration}
+
+\begin{center}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lll}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Parameter} & \textbf{Deep Models} & \textbf{ESN} \\
+  \midrule
+  Trajectories    & 500             & 500 (30\% used) \\
+  Lookback $L$    & 50 steps        & Full sequence \\
+  Optimiser       & Adam            & Ridge regression \\
+  Loss            & MSE             & Least squares \\
+  Epochs          & 50/12/80 (M/L/T)& N/A \\
+  Grad clipping   & max\_norm=1.0   & N/A \\
+  LR scheduler    & ReduceLROnPlateau & N/A \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\newpage
+
+% =============================================================
+\section{Experimental Setup}
+% =============================================================
+
+\begin{table}[H]
+\centering
+\caption{Simulation parameters used throughout all experiments.}
+\label{tab:params}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lll}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+  \midrule
+  $\sigma$, $\rho$, $\beta$  & 10, 28, 8/3  & Standard chaotic parameters \\
+  Trajectories (HPC)         & 100           & For speedup benchmarking \\
+  Trajectories (AI)          & 500           & For surrogate training \\
+  Simulation time $T$        & 25.0 s        & Total integration time \\
+  Time step $\Delta t$       & 0.01 s        & RK4 step size \\
+  Steps per trajectory       & 2500          & $T / \Delta t$ \\
+  Train / Val / Test         & 70\% / 15\% / 15\% & Dataset split \\
+  Random seed                & 42            & Reproducibility \\
+  HPC platform               & Local Linux   & \texttt{g++}, \texttt{nvcc} \\
+  AI platform                & Kaggle T4 GPU & PyTorch 2.9, CUDA 12.6 \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+% =============================================================
+\section{Results}
+% =============================================================
+
+\subsection{Lorenz Attractor Visualisation}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.72\textwidth]{01_lorenz_attractor_3d.png}
+  \caption{3D Lorenz strange attractor computed via RK4 integration
+           ($\sigma=10$, $\rho=28$, $\beta=8/3$, $\Delta t=0.01$, $T=25$\,s).
+           The characteristic double-lobe butterfly shape confirms correct
+           chaotic regime behaviour.}
+  \label{fig:attractor}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{05_phase_space_projections.png}
+  \caption{2D phase-space projections of the Lorenz attractor:
+           $X$--$Y$ (left), $X$--$Z$ (centre), $Y$--$Z$ (right).
+           Green dot: trajectory start; red cross: trajectory end.}
+  \label{fig:phase}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{06_trajectory_evolution.png}
+  \caption{Time-series evolution of $X$, $Y$, $Z$ over 500 integration steps.
+           The irregular, non-repeating oscillations confirm chaotic dynamics.}
+  \label{fig:stateevol}
+\end{figure}
+
+\subsection{HPC Performance: Phase 1 (Simulation to Checkpoint)}
+
+The primary purpose of OpenMP and CUDA in this pipeline is to rapidly generate
+trajectories up to the checkpoint using parallelised RK4 integration. Since each
+trajectory is independent, this is an embarrassingly parallel workload that maps
+perfectly to both multi-core and many-core architectures.
+
+\begin{table}[H]
+\centering
+\caption{HPC benchmarking: 100 trajectories, 2500 steps each.
+         Speedup relative to Python RK4 baseline.}
+\label{tab:hpc}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lrrr}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Method} & \textbf{Time (ms)} &
+  \textbf{Speedup} & \textbf{Throughput (traj/s)} \\
+  \midrule
+  Python RK4 (baseline) & 3365.23 & 1.00$\times$              & 29.71    \\
+  Python Euler          & 762.45  & 4.41$\times$               & 131.15   \\
+  OpenMP (C++)          & 2.00    & \good{1682.6$\times$}      & 50{,}000 \\
+  CUDA (GPU)            & 1.02    & \good{3299.2$\times$}      & 98{,}039 \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{04_performance_comparison.png}
+  \caption{Left: absolute execution times for all methods. Right: speedup factors
+           relative to Python RK4. OpenMP and CUDA deliver the dominant speedups
+           for Phase 1 trajectory generation up to the checkpoint.}
+  \label{fig:hpcperf}
+\end{figure}
+
+The CUDA/OpenMP speedup ratio ($\approx 2\times$) at $N=100$ trajectories reflects
+the relatively small problem size for GPU utilisation. At $N=10{,}000$ trajectories,
+this ratio would widen to $10$--$50\times$ as GPU parallelism is better exploited.
+
+\subsection{AI Surrogate Results: Phase 2 (Checkpoint to Future)}
+
+Once HPC delivers the checkpoint state, the AI surrogate takes over. Four models
+were trained and evaluated on 500 trajectories with lookback window $L=50$.
+
+\subsubsection{Training Convergence}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{1773840048444_02_training_history.png}
+  \caption{Training and validation MSE loss (log scale) for MLP (left),
+           improved LSTM (centre), and TCN (right) over their respective
+           epochs. TCN shows the fastest and deepest convergence.}
+  \label{fig:training}
+\end{figure}
+
+\subsubsection{Single-Step Prediction Accuracy}
+
+\begin{table}[H]
+\centering
+\caption{Single-step prediction accuracy on the test set (normalised units).
+         Green cells indicate best value in each column.}
+\label{tab:singlestep}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lrrrr}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Model} & \textbf{RMSE} & \textbf{MAE} &
+  \textbf{Improvement vs Baseline} & \textbf{Train Time} \\
+  \midrule
+  MLP (original baseline) & 0.5256 & 0.4574 & ---              & 200 epochs \\
+  MLP (improved)          & 0.4027 & 0.3184 & +23.4\%           & 33 min \\
+  LSTM (improved)         & 0.2179 & 0.1643 & +58.5\%           & 41 min \\
+  TCN                     & \good{0.0128} & \good{0.0079} & \good{+97.6\%} & 159 min \\
+  ESN                     & 0.0134 & 0.0096 & +97.5\%           & \good{33 sec} \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{07_rmse_mae_comparison.png}
+  \caption{Single-step RMSE (left) and MAE (right) for all four models.
+           TCN and ESN achieve near-identical accuracy, both reducing error
+           by $\approx$97.5\% over the original baseline.}
+  \label{fig:rmse}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{10_results_table.png}
+  \caption{Complete results summary table. Green cells indicate best
+           performance in each metric category.}
+  \label{fig:table}
+\end{figure}
+
+\subsubsection{Training Time vs Accuracy Tradeoff}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{08_time_vs_accuracy.png}
+  \caption{Training time vs RMSE tradeoff. The ESN achieves essentially
+           the same accuracy as TCN (0.0134 vs 0.0128) while training in
+           33 seconds rather than 159 minutes --- a 290$\times$ faster
+           training time for equivalent accuracy.}
+  \label{fig:tradeoff}
+\end{figure}
+
+\subsubsection{Improvement Over Original Baseline}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{11_improvement_over_baseline.png}
+  \caption{Percentage RMSE improvement of each model over the original
+           baseline (RMSE = 0.5256). TCN and ESN both achieve $>$97\%
+           improvement.}
+  \label{fig:improvement}
+\end{figure}
+
+\subsubsection{Multi-Step Rollout Analysis}
+
+The most demanding test is autoregressive rollout: each model's prediction is fed
+back as input for subsequent steps. This tests whether the surrogate can sustain
+trajectory quality beyond single-step prediction.
+
+\begin{table}[H]
+\centering
+\caption{200-step autoregressive rollout L2 error (original units).}
+\label{tab:rollout}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lrr}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Model} & \textbf{Mean L2} & \textbf{Max L2} \\
+  \midrule
+  MLP             & 9.5357  & 28.1619 \\
+  LSTM (improved) & 8.5379  & 22.1789 \\
+  ESN             & 5.8002  & 26.0734 \\
+  TCN             & \good{2.6097}  & \good{13.7378} \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{09_rollout_error_comparison.png}
+  \caption{200-step rollout mean L2 (solid) and max L2 (hatched) for all
+           models. TCN achieves the lowest mean error (2.61), nearly
+           half that of ESN (5.80) and one-third of MLP/LSTM.}
+  \label{fig:rollouterr}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{1773840048444_04_error_horizon.png}
+  \caption{L2 error vs prediction step (linear and log scales) for all
+           models over 200-step rollout. TCN maintains the lowest error
+           profile; ESN shows stable bounded growth.}
+  \label{fig:horizon}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{1773840048444_05_rollout_comparison.png}
+  \caption{Multi-step rollout trajectory comparison (100 steps).
+           Black: RK4 reference. All models track closely for the first
+           $\approx$40 steps; TCN and ESN maintain trajectory shape
+           longest before diverging due to the Lyapunov instability.}
+  \label{fig:rollout}
+\end{figure}
+
+\subsubsection{ESN Attractor Stability}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{1773840048445_06_phase_space_esn.png}
+  \caption{3D phase space comparison over 1000 steps: RK4 reference (left)
+           vs ESN rollout (right). The ESN trajectory remains confined to
+           the correct attractor region, confirming that the reservoir has
+           learned the global attractor geometry even when individual
+           trajectory details diverge.}
+  \label{fig:esnattractor}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{12_phase_space_2d.png}
+  \caption{2D phase-space projections of the Lorenz attractor used for
+           surrogate training and evaluation.}
+  \label{fig:phase2d}
+\end{figure}
+
+% =============================================================
+\section{Discussion}
+% =============================================================
+
+\subsection{HPC Results --- Primary Contribution}
+
+OpenMP (\good{1682$\times$}) and CUDA (\good{3299$\times$}) deliver the project's
+definitive achievement. Both are real, reproducible, and correctly motivated: they
+accelerate the physics-based simulation stage that must be accurate. The
+embarrassingly parallel structure of multi-trajectory generation maps perfectly to
+both architectures.
+
+The CUDA/OpenMP ratio of $\approx$2$\times$ at $N=100$ is expected --- GPU overhead
+dominates at small problem sizes. For $N=10^4$, the GPU advantage would be $10$--$50\times$.
+
+\subsection{AI Surrogate Results}
+
+\subsubsection{TCN: Best Accuracy}
+TCN achieves RMSE 0.0128 --- a 97.6\% improvement over the baseline. Dilated causal
+convolutions capture the temporal structure of the Lorenz attractor across the full
+$L=50$ lookback window without vanishing gradient issues. Its rollout mean L2 of 2.61
+is the lowest of all models, confirming it as the best surrogate for sustained
+prediction.
+
+\subsubsection{ESN: Best Efficiency}
+ESN achieves RMSE 0.0134 --- essentially identical accuracy to TCN --- while training
+in 33 seconds. This is 290$\times$ faster training than TCN for comparable accuracy.
+The ESN's reservoir, being itself a nonlinear dynamical system, naturally resonates
+with the Lorenz attractor's structure. Figure~\ref{fig:esnattractor} confirms the ESN
+stays on the correct attractor even after 1000 rollout steps.
+
+\subsubsection{Why MLP and LSTM Underperform}
+MLP (RMSE 0.4027) lacks temporal inductive bias --- it treats the window as flat
+features with no sequential ordering. LSTM (RMSE 0.2179) is limited by the small
+epoch budget (12 epochs due to $\approx$3.4 min/epoch on T4) and the difficulty of
+backpropagating through long sequences in chaotic systems.
+
+\subsubsection{Rollout Limitations and Physical Explanation}
+All models diverge in long-horizon rollout. This is not a modelling failure --- it is
+a physical consequence of the positive Lyapunov exponent ($\lambda \approx 0.906$).
+Prediction errors grow as $\varepsilon e^{0.906 t}$, limiting reliable prediction to
+$\approx 110$ steps regardless of model quality. The ESN's bounded rollout growth
+(Figure~\ref{fig:horizon}) and correct attractor confinement (Figure~\ref{fig:esnattractor})
+suggest it has captured the global attractor geometry better than other models.
+
+\subsection{Sensitivity Analysis}
+
+\textbf{Lookback window} ($L=10 \to 50$): Increasing from 10 to 50 steps captures
+$\approx$45\% of the Lyapunov time, significantly improving LSTM and enabling TCN to
+leverage its dilated receptive field.
+
+\textbf{Trajectories} (100 $\to$ 500): Better attractor coverage improves
+generalisation. With the CUDA solver, generating 500 trajectories takes
+$<$1 second --- making large datasets essentially free.
+
+\textbf{ESN spectral radius}: Must be $<1.0$ for echo state property (stability).
+The value 0.95 provides strong memory while maintaining stability.
+
+% =============================================================
+\section{Conclusions}
+% =============================================================
+
+This project implements and evaluates a complete hybrid HPC+AI pipeline for the
+Lorenz system, with the following key conclusions:
+
+\begin{enumerate}
+  \item \textbf{HPC is the primary contribution.} OpenMP (\good{1682$\times$}) and
+        CUDA (\good{3299$\times$}) deliver exceptional speedups for Phase 1
+        trajectory generation. The embarrassingly parallel structure maps perfectly
+        to both architectures.
+
+  \item \textbf{TCN is the best surrogate.} RMSE 0.0128, mean rollout L2 of 2.61,
+        and the best long-horizon trajectory tracking. Dilated causal convolutions
+        are well-matched to chaotic temporal structure.
+
+  \item \textbf{ESN is the most efficient.} Near-identical accuracy to TCN (RMSE
+        0.0134) achieved in 33 seconds of training --- 290$\times$ faster. The
+        reservoir's dynamical nature naturally echoes the Lorenz attractor geometry.
+
+  \item \textbf{HPC and AI are complementary, not competing.} HPC handles accurate
+        physics simulation to the checkpoint; AI handles rapid prediction beyond it.
+        This framing correctly positions both components.
+
+  \item \textbf{Chaotic systems impose fundamental limits.} All models diverge in
+        long rollout due to the Lyapunov exponent. This is a physical constraint,
+        not a modelling failure.
+\end{enumerate}
+
+\newpage 
+
+\subsection{Future Work}
+
+\begin{itemize}
+  \item \textbf{Physics-Informed Neural Networks (PINNs):} Embed Lorenz equations
+        in the loss function to enforce physical consistency.
+  \item \textbf{Multi-GPU scaling:} Extend CUDA with MPI for $10^6$-trajectory
+        ensembles.
+  \item \textbf{Transformer surrogates:} Recent work shows $<$2\% relative L2 error
+        on Lorenz with easy-attention Transformers~\cite{raissi2019}.
+  \item \textbf{Adaptive checkpoint:} Dynamically set the handoff point based on
+        estimated local Lyapunov exponent.
+  \item \textbf{Uncertainty quantification:} Ensemble ESNs for prediction intervals.
+\end{itemize}
+
+\bibliographystyle{plainnat}
+\begin{thebibliography}{9}
+
+\bibitem{lorenz1963}
+Lorenz, E.~N. (1963).
+\newblock Deterministic nonperiodic flow.
+\newblock \textit{Journal of Atmospheric Sciences}, 20(2), 130--141.
+
+\bibitem{hairer1993}
+Hairer, E., N{\o}rsett, S.~P., \& Wanner, G. (1993).
+\newblock \textit{Solving Ordinary Differential Equations I} (2nd ed.).
+\newblock Springer-Verlag.
+
+\bibitem{raissi2019}
+Raissi, M., Perdikaris, P., \& Karniadakis, G.~E. (2019).
+\newblock Physics-informed neural networks.
+\newblock \textit{Journal of Computational Physics}, 378, 686--707.
+
+\bibitem{chen2018}
+Chen, R.~T.~Q., Rubanova, Y., Bettencourt, J., \& Duvenaud, D. (2018).
+\newblock Neural ordinary differential equations.
+\newblock \textit{NeurIPS}, 31.
+
+\bibitem{pathak2018}
+Pathak, J., Hunt, B., Girvan, M., Lu, Z., \& Ott, E. (2018).
+\newblock Model-free prediction of large spatiotemporally chaotic systems from
+  data: A reservoir computing approach.
+\newblock \textit{Physical Review Letters}, 120(2), 024102.
+
+\bibitem{tcn2021}
+Iwana, B.~K., \& Uchida, S. (2021).
+\newblock An empirical evaluation of temporal convolutional networks for
+  time series classification.
+\newblock \textit{PLOS ONE}, 16(6), e0254841.
+
+\bibitem{openmp}
+OpenMP Architecture Review Board (2021).
+\newblock \textit{OpenMP Application Programming Interface, Version 5.2}.
+\newblock \url{https://www.openmp.org/}
+
+\bibitem{nvidia_cuda}
+NVIDIA Corporation (2023).
+\newblock \textit{CUDA C++ Programming Guide}.
+\newblock \url{https://docs.nvidia.com/cuda/cuda-c-programming-guide/}
+
+\end{thebibliography}
+
+% =============================================================
+\appendix
+\section{Complete Results Summary}
+% =============================================================
+
+\begin{center}
+\rowcolors{2}{lightblue}{white}
+\begin{tabular}{lrrrrrr}
+  \toprule
+  \rowcolor{accent!15}
+  \textbf{Model} & \textbf{RMSE} & \textbf{MAE} &
+  \textbf{Roll. Mean} & \textbf{Roll. Max} &
+  \textbf{Train Time} & \textbf{Improvement} \\
+  \midrule
+  MLP (original) & 0.5256 & 0.4574 & 31.12 & 45.23 & --- & baseline \\
+  MLP (improved) & 0.4027 & 0.3184 & 9.54  & 28.16 & 33 min  & +23.4\% \\
+  LSTM (improved)& 0.2179 & 0.1643 & 8.54  & 22.18 & 41 min  & +58.5\% \\
+  TCN            & \good{0.0128} & \good{0.0079} & \good{2.61} & \good{13.74} & 159 min & \good{+97.6\%} \\
+  ESN            & 0.0134 & 0.0096 & 5.80  & 26.07 & \good{33 sec} & +97.5\% \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{Master Notebook Structure}
+
+Both notebooks are fully reproducible:
+\begin{itemize}
+  \item \textbf{lorenz\_hpc.ipynb} (27 cells) --- local HPC benchmarking,
+        original MLP/LSTM, report generation.
+  \item \textbf{lorenz\_improved.ipynb} (22 cells) --- Kaggle T4 GPU,
+        improved LSTM + TCN + ESN, all plots.
+\end{itemize}
+
+\end{document}

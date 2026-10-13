@@ -1,0 +1,37 @@
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Jupyter temporary files
+.ipynb_checkpoints/
+
+# Logs and temporary outputs
+*.log
+*.tmp
+*.bak
+
+# Build artifacts
+build/
+dist/
+*.o
+*.out
+*.so
+*.a
+
+# Generated CUDA binaries
+*.cubin
+*.fatbin
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local secrets and environment settings
+.env
+.env.*
+!.env.example
